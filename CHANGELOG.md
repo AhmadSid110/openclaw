@@ -46,6 +46,7 @@ Docs: https://docs.clawd.bot
 - Agents: auto-compact on context overflow prompt errors before failing. (#1627) Thanks @rodrigouroz.
 - Agents: use the active auth profile for auto-compaction recovery.
 - Models: default missing custom provider fields so minimal configs are accepted.
+- Models/Heartbeat: normalize provider-less default model fallback and skip empty checklist items. (#1762) Thanks @senoldogann.
 - Media understanding: skip image understanding when the primary model already supports vision. (#1747) Thanks @tyler6204.
 - Gateway: skip Tailscale DNS probing when tailscale.mode is off. (#1671)
 - Gateway: reduce log noise for late invokes + remote node probes; debounce skills refresh. (#1607) Thanks @petter-b.

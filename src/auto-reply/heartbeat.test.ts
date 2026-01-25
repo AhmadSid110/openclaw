@@ -133,6 +133,15 @@ describe("isHeartbeatContentEffectivelyEmpty", () => {
     expect(isHeartbeatContentEffectivelyEmpty("# HEARTBEAT.md\n\n")).toBe(true);
   });
 
+  it("returns true for empty list items", () => {
+    expect(isHeartbeatContentEffectivelyEmpty("- ")).toBe(true);
+    expect(isHeartbeatContentEffectivelyEmpty("- [ ]")).toBe(true);
+    expect(isHeartbeatContentEffectivelyEmpty("- [x]")).toBe(true);
+    expect(isHeartbeatContentEffectivelyEmpty("* [ ]")).toBe(true);
+    expect(isHeartbeatContentEffectivelyEmpty("+ [ ]")).toBe(true);
+    expect(isHeartbeatContentEffectivelyEmpty("# HEARTBEAT.md\n- [ ]")).toBe(true);
+  });
+
   it("returns true for comments only", () => {
     expect(isHeartbeatContentEffectivelyEmpty("# Header\n# Another comment")).toBe(true);
     expect(isHeartbeatContentEffectivelyEmpty("## Subheader\n### Another")).toBe(true);

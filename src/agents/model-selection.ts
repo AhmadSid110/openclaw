@@ -137,10 +137,11 @@ export function resolveConfiguredModelRef(params: {
       if (aliasMatch) return aliasMatch.ref;
 
       // Default to anthropic if no provider is specified, but warn as this is deprecated.
+      const normalized = normalizeProviderModelId("anthropic", trimmed);
       console.warn(
-        `[clawdbot] Model "${trimmed}" specified without provider. Falling back to "anthropic/${trimmed}". Please use "anthropic/${trimmed}" in your config.`,
+        `[clawdbot] Model "${trimmed}" specified without provider. Falling back to "anthropic/${normalized}". Please use "anthropic/${normalized}" in your config.`,
       );
-      return { provider: "anthropic", model: trimmed };
+      return { provider: "anthropic", model: normalized };
     }
 
     const resolved = resolveModelRefFromString({
