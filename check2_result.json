@@ -1,0 +1,24 @@
+{
+  "logs": [
+    {
+      "type": "info",
+      "text": "Sibyl integration booted: mountOpenClawChat(), attachOpenClawWebSocket(ws)"
+    },
+    {
+      "type": "log",
+      "text": "preset default"
+    }
+  ],
+  "types": {
+    "mount": "function",
+    "attach": "function",
+    "addEvent": "function",
+    "ws": "object"
+  },
+  "mountResult": {
+    "ok": true
+  },
+  "attachResult": {
+    "ok": true
+  }
+}
