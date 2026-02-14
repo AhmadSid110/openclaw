@@ -1,0 +1,4 @@
+[
+  { "id": "default", "name": "Default", "model": "github-copilot/gpt-5-mini" },
+  { "id": "fast", "name": "Fast", "model": "do-gpt5" }
+]
