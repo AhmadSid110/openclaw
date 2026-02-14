@@ -302,6 +302,11 @@ export class OpenClawApp extends LitElement {
   @state() debugStatus: StatusSummary | null = null;
   @state() debugHealth: HealthSnapshot | null = null;
   @state() debugModels: unknown[] = [];
+  // Models UI state
+  @state() models: Array<{id:string,label:string,provider:string,context?:number,capabilities?:string[],enabled?:boolean}> = [];
+  @state() activeModelId: string | null = null;
+  @state() loadingModels = false;
+  @state() activatingModel: string | null = null;
   @state() debugHeartbeat: unknown = null;
   @state() debugCallMethod = "";
   @state() debugCallParams = "{}";
@@ -563,6 +568,46 @@ export class OpenClawApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  async loadModels() {
+    this.loadingModels = true;
+    try {
+      const res = await fetch('/api/models', { method: 'GET', credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      if (!body.ok) throw new Error(body.error || 'bad response');
+      this.models = body.models || [];
+      this.activeModelId = body.activeModelId || null;
+    } catch (err) {
+      this.debugCallError = `Failed to load models: ${String(err)}`;
+    } finally {
+      this.loadingModels = false;
+      this.requestUpdate();
+    }
+  }
+
+  async setDefaultModel(modelId: string) {
+    this.activatingModel = modelId;
+    try {
+      const res = await fetch('/api/agent/model', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ modelId }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.ok) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      // refresh
+      await this.loadModels();
+    } catch (err) {
+      this.debugCallError = `Failed to activate model: ${String(err)}`;
+    } finally {
+      this.activatingModel = null;
+      this.requestUpdate();
+    }
   }
 
   render() {
