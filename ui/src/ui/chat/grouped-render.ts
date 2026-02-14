@@ -277,6 +277,16 @@ function renderGroupedMessage(
           : nothing
       }
       ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
+      ${renderModelStamp(message)}
     </div>
   `;
 }
+
+function renderModelStamp(message: unknown) {
+  const m = message as Record<string, unknown>;
+  const meta = (m.__openclaw as Record<string, unknown> | undefined) ?? {};
+  const modelLabel = typeof meta.modelLabel === 'string' ? meta.modelLabel : typeof meta.model === 'string' ? meta.model : null;
+  if (!modelLabel) return nothing;
+  return html`<div style="font-size:11px; color:var(--muted); margin-top:6px;">Generated with ${modelLabel}</div>`;
+}
+
