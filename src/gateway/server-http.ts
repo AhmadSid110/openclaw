@@ -446,6 +446,41 @@ export function createGatewayHttpServer(opts: {
       return;
     }
 
+    // Expose a read-only /api/models for the Control UI to list available
+    // models and the active model. Return only safe metadata.
+    try {
+      const parsed = new URL(req.url ?? '/', 'http://localhost');
+      if (parsed.pathname === '/api/models') {
+        if (req.method !== 'GET') {
+          sendJson(res, 405, { ok: false, error: 'method not allowed' });
+          return;
+        }
+        const cfg = loadConfig();
+        const catalog = await loadGatewayModelCatalog();
+        let activeModelId: string | null = null;
+        try {
+          activeModelId =
+            typeof cfg?.agents?.defaults?.model?.primary === 'string'
+              ? cfg.agents.defaults.model.primary
+              : null;
+        } catch (_) {
+          activeModelId = null;
+        }
+        const models = (catalog || []).map((m) => ({
+          id: m.key ?? `${m.provider}/${m.model}`,
+          label: m.name ?? `${m.provider}/${m.model}`,
+          provider: m.provider ?? 'unknown',
+          context: (m as any).contextWindow ?? null,
+          capabilities: (m as any).tags ?? [],
+          enabled: !(m as any).missing && Boolean((m as any).available !== false),
+        }));
+        sendJson(res, 200, { ok: true, activeModelId, models });
+        return;
+      }
+    } catch (err) {
+      // ignore and continue to normal routing
+    }
+
     try {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
