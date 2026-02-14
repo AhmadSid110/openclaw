@@ -4,6 +4,8 @@ import { useEventStream } from './openclaw_useEventStream';
 import { ChatView } from './openclaw_ChatView';
 import { ToolTracePanel } from './openclaw_ToolTrace';
 import { PresetBadge } from './openclaw_PresetBadge';
+import presets from './openclaw_presets.json';
+import React, { useState, useEffect } from 'react';
 
 // Ensure a safe global event queue and placeholders so the host can push events
 // before the React app mounts. This prevents __openclaw_addEvent from being
@@ -21,6 +23,15 @@ import { PresetBadge } from './openclaw_PresetBadge';
 
 function App() {
   const { chatMessages, toolTraces, addEvent, stop, insertAssistantMessage, clear } = useEventStream();
+  const [modelLabel, setModelLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const id = (localStorage.getItem('openclaw_preset') || 'default');
+      const p = presets.find((x: any) => x.id === id) || presets[0];
+      setModelLabel(p.model || null);
+    } catch (e) { setModelLabel(null); }
+  }, []);
   // Replace the placeholder with the real handler and flush queued events.
   (window as any).__openclaw_addEvent = addEvent;
   try {
@@ -39,8 +50,11 @@ function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: 8 }}>
         <div style={{ fontWeight: 700 }}>Sibyl — Chat</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <PresetBadge onChange={(id) => console.log('preset', id)} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <PresetBadge onChange={(id) => {
+            try { const p = presets.find((x: any) => x.id === id) || presets[0]; setModelLabel(p.model || null); } catch (e) {}
+          }} />
+          {modelLabel && <div style={{ padding: '4px 8px', background: '#f3f4f6', borderRadius: 6, fontSize: 12 }}>{modelLabel}</div>}
           <button onClick={() => clear()}>Reset</button>
         </div>
       </div>
