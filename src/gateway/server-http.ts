@@ -54,6 +54,7 @@ import { getBearerToken, getHeader } from "./http-utils.js";
 import { resolveGatewayClientIp } from "./net.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
+import { loadGatewayModelCatalog } from "./server-model-catalog.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
@@ -450,41 +451,89 @@ export function createGatewayHttpServer(opts: {
     // models and the active model. Return only safe metadata. Also provide
     // a POST /api/agent/model endpoint to request activation of a model by id.
     try {
-      const parsed = new URL(req.url ?? '/', 'http://localhost');
+      const parsed = new URL(req.url ?? "/", "http://localhost");
 
       // GET /api/models - read-only catalog + active model
-      if (parsed.pathname === '/api/models') {
-        if (req.method !== 'GET') {
-          sendJson(res, 405, { ok: false, error: 'method not allowed' });
+      if (parsed.pathname === "/api/models") {
+        if (req.method !== "GET") {
+          sendJson(res, 405, { ok: false, error: "method not allowed" });
           return;
         }
         const cfg = loadConfig();
         const catalog = await loadGatewayModelCatalog();
         let activeModelId: string | null = null;
         try {
+          // Check for 'main' agent override first
+          const mainAgent = (cfg?.agents as any)?.list?.find((a: any) => a.id === "main");
           activeModelId =
-            typeof cfg?.agents?.defaults?.model?.primary === 'string'
-              ? cfg.agents.defaults.model.primary
-              : null;
+            mainAgent?.model?.primary || cfg?.agents?.defaults?.model?.primary || null;
         } catch (_) {
           activeModelId = null;
         }
-        const models = (catalog || []).map((m) => ({
-          id: m.key ?? `${m.provider}/${m.model}`,
-          label: m.name ?? `${m.provider}/${m.model}`,
-          provider: m.provider ?? 'unknown',
-          context: (m as any).contextWindow ?? null,
-          capabilities: (m as any).tags ?? [],
-          enabled: !(m as any).missing && Boolean((m as any).available !== false),
-        }));
-        sendJson(res, 200, { ok: true, activeModelId, models });
+
+        // Collect all explicitly configured model IDs from the providers section
+        const configuredModels: any[] = [];
+        if (cfg?.models?.providers) {
+          for (const [providerKey, providerCfg] of Object.entries(cfg.models.providers)) {
+            const p = providerCfg as any;
+            if (Array.isArray(p.models)) {
+              for (const m of p.models) {
+                const fullId = `${providerKey}/${m.id}`;
+                configuredModels.push({
+                  id: fullId,
+                  label: m.name || m.id,
+                  provider: providerKey,
+                  context: m.contextWindow || null,
+                  enabled: true,
+                  capabilities: m.input || [],
+                });
+              }
+            }
+          }
+        }
+
+        // Include built-in providers (GitHub, Google) which don't use models.providers
+        const builtinProviders = new Set(["github-copilot", "google-gemini-cli"]);
+        if (catalog) {
+          for (const m of catalog) {
+            if (builtinProviders.has(m.provider)) {
+              const fullId = m.key ?? m.id;
+              if (!configuredModels.find((x) => x.id === fullId)) {
+                configuredModels.push({
+                  id: fullId,
+                  label: m.name || m.id,
+                  provider: m.provider,
+                  context: (m as any).contextWindow || null,
+                  enabled: true,
+                  capabilities: (m as any).input || [],
+                });
+              }
+            }
+          }
+        }
+
+        // Always ensure the active model is in the list, even if not in the providers section
+        // (e.g. built-in models like copilot/gemini-cli)
+        if (activeModelId && !configuredModels.find((m) => m.id === activeModelId)) {
+          const m = (catalog || []).find((c) => (c.key ?? c.id) === activeModelId);
+          configuredModels.unshift({
+            id: activeModelId,
+            label: m?.name || activeModelId,
+            provider: m?.provider || "built-in",
+            context: (m as any)?.contextWindow || null,
+            enabled: true,
+            capabilities: (m as any)?.input || [],
+          });
+        }
+
+        sendJson(res, 200, { ok: true, activeModelId, models: configuredModels });
         return;
       }
 
       // POST /api/agent/model - activate a model (persist agents.defaults.model.primary)
-      if (parsed.pathname === '/api/agent/model') {
-        if (req.method !== 'POST') {
-          sendJson(res, 405, { ok: false, error: 'method not allowed' });
+      if (parsed.pathname === "/api/agent/model") {
+        if (req.method !== "POST") {
+          sendJson(res, 405, { ok: false, error: "method not allowed" });
           return;
         }
 
@@ -493,7 +542,9 @@ export function createGatewayHttpServer(opts: {
         const trustedProxies = cfg.gateway?.trustedProxies ?? [];
         const authResult = await authorizeGatewayConnect({
           auth: resolvedAuth,
-          connectAuth: getBearerToken(req) ? { token: getBearerToken(req), password: getBearerToken(req) } : null,
+          connectAuth: getBearerToken(req)
+            ? { token: getBearerToken(req), password: getBearerToken(req) }
+            : null,
           req,
           trustedProxies,
           rateLimiter,
@@ -506,22 +557,25 @@ export function createGatewayHttpServer(opts: {
         // parse body
         const body = await readJsonBody(req, 1024 * 8);
         if (!body.ok) {
-          const status = body.error === 'payload too large' ? 413 : 400;
+          const status = body.error === "payload too large" ? 413 : 400;
           sendJson(res, status, { ok: false, error: body.error });
           return;
         }
-        const payload = typeof body.value === 'object' && body.value !== null ? (body.value as any) : {};
-        const modelId = typeof payload.modelId === 'string' ? payload.modelId : null;
+        const payload =
+          typeof body.value === "object" && body.value !== null ? (body.value as any) : {};
+        const modelId = typeof payload.modelId === "string" ? payload.modelId : null;
         if (!modelId) {
-          sendJson(res, 400, { ok: false, error: 'missing modelId' });
+          sendJson(res, 400, { ok: false, error: "missing modelId" });
           return;
         }
 
         // validate model exists in catalog
         const catalog = await loadGatewayModelCatalog();
-        const found = (catalog || []).find((m) => (m.key ?? `${m.provider}/${m.model}`) === modelId);
+        const found = (catalog || []).find(
+          (m) => (m.key ?? `${m.provider}/${m.model}`) === modelId,
+        );
         if (!found) {
-          sendJson(res, 400, { ok: false, error: 'unknown model' });
+          sendJson(res, 400, { ok: false, error: "unknown model" });
           return;
         }
 
@@ -546,13 +600,17 @@ export function createGatewayHttpServer(opts: {
           let applied = false;
           try {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { applyConfigPatchRpc } = require('./server-methods/config');
-            if (typeof applyConfigPatchRpc === 'function') {
+            const { applyConfigPatchRpc } = require("./server-methods/config");
+            if (typeof applyConfigPatchRpc === "function") {
               const result = await applyConfigPatchRpc({ patch, baseHash });
               if (result && result.ok) {
                 applied = true;
               } else if (result && result.error) {
-                sendJson(res, 409, { ok: false, error: 'config apply failed', detail: result.error });
+                sendJson(res, 409, {
+                  ok: false,
+                  error: "config apply failed",
+                  detail: result.error,
+                });
                 return;
               }
             }
@@ -564,8 +622,8 @@ export function createGatewayHttpServer(opts: {
             // best-effort: attempt to write to disk via config module if it exposes a save helper
             try {
               // eslint-disable-next-line @typescript-eslint/no-var-requires
-              const cfgModule = require('../config/config');
-              if (cfgModule && typeof cfgModule.writeConfig === 'function') {
+              const cfgModule = require("../config/config");
+              if (cfgModule && typeof cfgModule.writeConfig === "function") {
                 const newCfg = { ...current } as any;
                 newCfg.agents = newCfg.agents || {};
                 newCfg.agents.defaults = newCfg.agents.defaults || {};
@@ -581,7 +639,10 @@ export function createGatewayHttpServer(opts: {
 
           if (!applied) {
             // As a last resort, return a 500 indicating inability to persist
-            sendJson(res, 500, { ok: false, error: 'cannot persist configuration in this runtime' });
+            sendJson(res, 500, {
+              ok: false,
+              error: "cannot persist configuration in this runtime",
+            });
             return;
           }
 
