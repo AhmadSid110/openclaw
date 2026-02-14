@@ -2,61 +2,114 @@ import { html } from "lit";
 import type { AppViewState } from "../app-view-state.ts";
 
 export function renderModels(state: AppViewState) {
-  const models = state.debugModels ?? [];
+  const models = state.models ?? [];
+  const active = state.activeModelId ?? null;
+
   return html`
     <div class="card">
-      <div class="card-title">Model Catalog</div>
-      <div class="card-sub">Catalog from models.list.</div>
+      <div class="card-title">Models</div>
+      <div class="card-sub">Authoritative model catalog from the gateway.</div>
       <div style="padding:8px; display:flex; gap:8px; align-items:center;">
-        <button @click=${() => { (state as any).loadModels && (state as any).loadModels(); }} class="btn">Refresh</button>
-        <div style="color:var(--muted); font-size:12px;">${state.debugLoading ? 'Loading…' : ''}</div>
+        <button @click=${() => loadModels(state)} class="btn">Refresh</button>
+        <div style="color:var(--muted); font-size:12px;">${state.loading ? 'Loading…' : ''}</div>
       </div>
+
+      ${state.callError ? html`<div style="padding:8px; background:var(--bg-contrast); border:1px solid var(--border); color:var(--danger); font-size:13px; margin:8px;">${state.callError}</div>` : ''}
+
       <div style="max-height:420px; overflow:auto; padding:8px;">
-        ${state.debugCallError ? html`<div style="padding:8px; background:var(--bg-contrast); border:1px solid var(--border); color:var(--danger); font-size:13px; margin-bottom:8px;">Error: ${state.debugCallError}</div>` : ''}
-        ${models.length === 0
-          ? html`<div class="muted">No models (refresh to probe gateway catalog).</div>`
-          : models.map((m: any) => html`
-              <div class="card-row" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px; border-bottom:1px solid var(--border);">
-                <div style="flex:1">
-                  <div style="font-weight:600">${m.provider}/${m.model}</div>
-                  <div style="font-size:12px; color:var(--muted)">${m.name ?? ''} ${m.reasoning ? html`<span class="chip">reasoning</span>` : ''}</div>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <button @click=${() => onSetDefault(state, m)} class="btn">Set as default</button>
-                </div>
-              </div>
-            `)}
+        <div style="margin-bottom:8px;">
+          <div style="font-weight:600; margin-bottom:6px">Active</div>
+          ${active
+            ? html`<div style="padding:8px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;"><div>${renderModelLabel(models, active)}</div><div style="font-size:12px; color:var(--muted)">Active</div></div>`
+            : html`<div class="muted">No active model configured.</div>`}
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="font-weight:600; margin-bottom:6px">Available</div>
+          ${models.filter((m: any) => m.enabled && (m.id !== active)).length === 0
+            ? html`<div class="muted">No available models.</div>`
+            : models.filter((m: any) => m.enabled && (m.id !== active)).map((m: any) => renderModelRow(state, m))}
+        </div>
+
+        <div>
+          <div style="font-weight:600; margin-bottom:6px">Unavailable</div>
+          ${models.filter((m: any) => !m.enabled).length === 0
+            ? html`<div class="muted">None.</div>`
+            : models.filter((m: any) => !m.enabled).map((m: any) => html`<div style="padding:8px; border-bottom:1px solid var(--border); color:var(--muted);">${m.label}</div>`)}
+        </div>
       </div>
     </div>
   `;
 }
 
-async function onSetDefault(state: AppViewState, model: any) {
+function renderModelLabel(models: any[], id: string) {
+  const m = models.find((x) => x.id === id);
+  return m ? html`${m.label}` : html`${id}`;
+}
+
+function renderModelRow(state: AppViewState, m: any) {
+  return html`<div style="padding:8px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <div style="font-weight:600">${m.label}</div>
+      <div style="font-size:12px; color:var(--muted)">${m.provider} ${m.context ? html`· context ${m.context}` : ''}</div>
+    </div>
+    <div>
+      <button class="btn" ?disabled=${state.streaming || state.activating === m.id} @click=${() => onActivate(state, m)}>Activate</button>
+    </div>
+  </div>`;
+}
+
+async function loadModels(state: AppViewState) {
   try {
-    const key = `${model.provider}/${model.model}`;
-    // Call into the app method if present
-    if ((state as any).setDefaultModel) {
-      await (state as any).setDefaultModel(key);
-      alert(`Default model set to ${key}`);
-    } else if ((state as any).client) {
-      // Fallback: attempt to patch config directly (best-effort)
-      try {
-        const res = await (state as any).client.request("config.get", {});
-        const cfg = res.config ?? {};
-        if (!cfg.agents) cfg.agents = {};
-        if (!cfg.agents.defaults) cfg.agents.defaults = {};
-        cfg.agents.defaults.model = { primary: key };
-        const raw = JSON.stringify(cfg, null, 2);
-        const baseHash = res.hash;
-        await (state as any).client.request("config.set", { raw, baseHash });
-        alert(`Default model set to ${key} (config.set)`);
-      } catch (err) {
-        alert(`Failed to set default model: ${String(err)}`);
-      }
-    } else {
-      alert('Unable to set default model: no client available');
-    }
+    state.loading = true;
+    state.callError = undefined;
+    const res = await fetch('/api/models', { method: 'GET', credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    if (!body.ok) throw new Error(body.error || 'bad response');
+    state.models = body.models || [];
+    state.activeModelId = body.activeModelId || null;
   } catch (err) {
-    alert(`Error: ${String(err)}`);
+    state.callError = String(err);
+  } finally {
+    state.loading = false;
+    // request a UI update if the app provides it
+    if ((state as any)._requestUpdate) (state as any)._requestUpdate();
   }
+}
+
+async function onActivate(state: AppViewState, model: any) {
+  const confirm = window.confirm(`Activate ${model.label}? This will become the default model for new runs.`);
+  if (!confirm) return;
+  try {
+    state.activating = model.id;
+    state.callError = undefined;
+    if ((state as any)._requestUpdate) (state as any)._requestUpdate();
+    const res = await fetch('/api/agent/model', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modelId: model.id }),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.ok) {
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    // refresh models
+    await loadModels(state);
+    // small success hint
+    if ((state as any).notify) (state as any).notify(`Activated ${model.label}`);
+  } catch (err) {
+    state.callError = String(err);
+  } finally {
+    state.activating = undefined;
+    if ((state as any)._requestUpdate) (state as any)._requestUpdate();
+  }
+}
+
+// Auto-load when module is used in the app if state exposes a hook
+// The app should call loadModels on tab open; we provide a convenience
+// to wire it if present.
+export function attachModelsLoader(state: AppViewState) {
+  (state as any).loadModels = () => loadModels(state);
 }
