@@ -1,0 +1,9 @@
+{
+  "name": "openclaw-playwright-sidecar",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "dependencies": {
+    "playwright-chromium": "latest"
+  }
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "default",
+    "name": "Default (do-gpt5)",
+    "model": "do-gpt5",
+    "systemPrompt": "You are OpenClaw assistant. Keep answers concise and technical."
+  },
+  {
+    "id": "dev",
+    "name": "Developer (verbose)",
+    "model": "do-gpt5",
+    "systemPrompt": "You are a developer assistant. Explain choices and tradeoffs."
+  }
+]

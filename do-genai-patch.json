@@ -1,0 +1,25 @@
+[
+  {
+    "op": "add",
+    "path": "/plugins/entries/digitalocean-genai",
+    "value": {
+      "kind": "inference",
+      "provider": {
+        "type": "openai-compatible",
+        "base_url": "https://api.digitalocean.com/genai/v1",
+        "env": "DIGITALOCEAN_MODEL_API_KEY"
+      },
+      "models": {
+        "deepseek-r1-distill-llama-70b": {
+          "id": "deepseek-r1-distill-llama-70b",
+          "model": "deepseek-r1-distill-llama-70b",
+          "reasoning": true,
+          "contextWindow": 32768,
+          "maxOutputTokens": 8192,
+          "notes": "DigitalOcean GenAI (DeepSeek) registered via plugin"
+        }
+      },
+      "notes": "DigitalOcean GenAI (Serverless Inference) plugin"
+    }
+  }
+]

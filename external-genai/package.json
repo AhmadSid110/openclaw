@@ -1,0 +1,17 @@
+{
+  "name": "openclaw-plugin-external-genai",
+  "version": "0.1.0",
+  "main": "index.js",
+  "openclaw": {
+    "plugin": true,
+    "extensions": ["plugins.entries"],
+    "configSchema": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "object" },
+        "models": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

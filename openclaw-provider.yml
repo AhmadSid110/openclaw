@@ -1,0 +1,12 @@
+# OpenClaw provider configuration for Modal as an OpenAI-compatible provider
+# This file references the API key via environment variable (safer than embedding the secret).
+provider: openai
+base_url: https://api.us-west-2.modal.direct/v1
+api_key: ${MODAL_API_KEY}
+models:
+  - zai-org/GLM-5-FP8
+
+# Notes:
+# - Call the model by setting "model": "zai-org/GLM-5-FP8" in request bodies.
+# - If you experience streaming hangs, set "stream": false in requests or disable streaming in OpenClaw's settings.
+# - Modal may not return usage fields; consider adding a fallback in usage accounting.
