@@ -243,6 +243,10 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadDebug(host as unknown as OpenClawApp);
     host.eventLog = host.eventLogBuffer;
   }
+  if (host.tab === "models") {
+    // Ensure model catalog is populated when visiting Models tab.
+    await loadDebug(host as unknown as OpenClawApp);
+  }
   if (host.tab === "logs") {
     host.logsAtBottom = true;
     await loadLogs(host as unknown as OpenClawApp, { reset: true });
