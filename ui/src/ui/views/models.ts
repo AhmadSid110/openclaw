@@ -12,6 +12,7 @@ export function renderModels(state: AppViewState) {
         <div style="color:var(--muted); font-size:12px;">${state.debugLoading ? 'Loading…' : ''}</div>
       </div>
       <div style="max-height:420px; overflow:auto; padding:8px;">
+        ${state.debugCallError ? html`<div style="padding:8px; background:var(--bg-contrast); border:1px solid var(--border); color:var(--danger); font-size:13px; margin-bottom:8px;">Error: ${state.debugCallError}</div>` : ''}
         ${models.length === 0
           ? html`<div class="muted">No models (refresh to probe gateway catalog).</div>`
           : models.map((m: any) => html`
