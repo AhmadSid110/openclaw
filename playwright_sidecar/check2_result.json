@@ -3,10 +3,6 @@
     {
       "type": "info",
       "text": "Sibyl integration booted: mountOpenClawChat(), attachOpenClawWebSocket(ws)"
-    },
-    {
-      "type": "log",
-      "text": "preset default"
     }
   ],
   "types": {
