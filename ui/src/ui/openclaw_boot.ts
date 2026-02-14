@@ -4,4 +4,4 @@ import { mountOpenClawChat, attachOpenClawWebSocket } from './openclaw_integrati
 ;(window as any).mountOpenClawChat = mountOpenClawChat;
 ;(window as any).attachOpenClawWebSocket = attachOpenClawWebSocket;
 
-console.info('OpenClaw integration booted: mountOpenClawChat(), attachOpenClawWebSocket(ws)');
+console.info('Sibyl integration booted: mountOpenClawChat(), attachOpenClawWebSocket(ws)');

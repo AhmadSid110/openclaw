@@ -38,7 +38,7 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: 8 }}>
-        <div style={{ fontWeight: 700 }}>OpenClaw — Chat</div>
+        <div style={{ fontWeight: 700 }}>Sibyl — Chat</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <PresetBadge onChange={(id) => console.log('preset', id)} />
           <button onClick={() => clear()}>Reset</button>
