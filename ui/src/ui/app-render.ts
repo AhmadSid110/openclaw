@@ -76,6 +76,7 @@ import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
+import { renderModels, attachModelsLoader } from "./views/models.ts";
 import { renderUsage } from "./views/usage.ts";
 
 const AVATAR_DATA_RE = /^data:/i;
@@ -603,6 +604,12 @@ export function renderApp(state: AppViewState) {
                 onRemove: (job) => removeCronJob(state, job),
                 onLoadRuns: (jobId) => loadCronRuns(state, jobId),
               })
+            : nothing
+        }
+
+        ${
+          state.tab === "models"
+            ? ( () => { if (!state.models.length && !state.loadingModels) { setTimeout(() => void state.loadModels(), 0); } return renderModels(state); })()
             : nothing
         }
 
