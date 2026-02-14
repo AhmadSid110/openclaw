@@ -447,9 +447,12 @@ export function createGatewayHttpServer(opts: {
     }
 
     // Expose a read-only /api/models for the Control UI to list available
-    // models and the active model. Return only safe metadata.
+    // models and the active model. Return only safe metadata. Also provide
+    // a POST /api/agent/model endpoint to request activation of a model by id.
     try {
       const parsed = new URL(req.url ?? '/', 'http://localhost');
+
+      // GET /api/models - read-only catalog + active model
       if (parsed.pathname === '/api/models') {
         if (req.method !== 'GET') {
           sendJson(res, 405, { ok: false, error: 'method not allowed' });
@@ -476,6 +479,119 @@ export function createGatewayHttpServer(opts: {
         }));
         sendJson(res, 200, { ok: true, activeModelId, models });
         return;
+      }
+
+      // POST /api/agent/model - activate a model (persist agents.defaults.model.primary)
+      if (parsed.pathname === '/api/agent/model') {
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { ok: false, error: 'method not allowed' });
+          return;
+        }
+
+        // authorize: require a valid gateway bearer token or local request
+        const cfg = loadConfig();
+        const trustedProxies = cfg.gateway?.trustedProxies ?? [];
+        const authResult = await authorizeGatewayConnect({
+          auth: resolvedAuth,
+          connectAuth: getBearerToken(req) ? { token: getBearerToken(req), password: getBearerToken(req) } : null,
+          req,
+          trustedProxies,
+          rateLimiter,
+        });
+        if (!authResult.ok) {
+          sendGatewayAuthFailure(res, authResult);
+          return;
+        }
+
+        // parse body
+        const body = await readJsonBody(req, 1024 * 8);
+        if (!body.ok) {
+          const status = body.error === 'payload too large' ? 413 : 400;
+          sendJson(res, status, { ok: false, error: body.error });
+          return;
+        }
+        const payload = typeof body.value === 'object' && body.value !== null ? (body.value as any) : {};
+        const modelId = typeof payload.modelId === 'string' ? payload.modelId : null;
+        if (!modelId) {
+          sendJson(res, 400, { ok: false, error: 'missing modelId' });
+          return;
+        }
+
+        // validate model exists in catalog
+        const catalog = await loadGatewayModelCatalog();
+        const found = (catalog || []).find((m) => (m.key ?? `${m.provider}/${m.model}`) === modelId);
+        if (!found) {
+          sendJson(res, 400, { ok: false, error: 'unknown model' });
+          return;
+        }
+
+        // Persist via existing config write flow: update agents.defaults.model.primary
+        try {
+          // load current raw config and prepare patch
+          const current = loadConfig();
+          const baseHash = current && (current as any)._meta && (current as any)._meta.baseHash;
+          const patch = {
+            agents: {
+              defaults: {
+                model: {
+                  primary: modelId,
+                },
+              },
+            },
+          } as any;
+
+          // Use internal RPC-style config apply if available on this runtime
+          // Fallback: attempt to write via config.apply method exposed in server-methods
+          // We will attempt to import the config RPC handler dynamically to avoid module cycles.
+          let applied = false;
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { applyConfigPatchRpc } = require('./server-methods/config');
+            if (typeof applyConfigPatchRpc === 'function') {
+              const result = await applyConfigPatchRpc({ patch, baseHash });
+              if (result && result.ok) {
+                applied = true;
+              } else if (result && result.error) {
+                sendJson(res, 409, { ok: false, error: 'config apply failed', detail: result.error });
+                return;
+              }
+            }
+          } catch (err) {
+            // not available; continue to try a best-effort in-memory update (non-persistent)
+          }
+
+          if (!applied) {
+            // best-effort: attempt to write to disk via config module if it exposes a save helper
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              const cfgModule = require('../config/config');
+              if (cfgModule && typeof cfgModule.writeConfig === 'function') {
+                const newCfg = { ...current } as any;
+                newCfg.agents = newCfg.agents || {};
+                newCfg.agents.defaults = newCfg.agents.defaults || {};
+                newCfg.agents.defaults.model = newCfg.agents.defaults.model || {};
+                newCfg.agents.defaults.model.primary = modelId;
+                await cfgModule.writeConfig(newCfg);
+                applied = true;
+              }
+            } catch (err) {
+              // ignore
+            }
+          }
+
+          if (!applied) {
+            // As a last resort, return a 500 indicating inability to persist
+            sendJson(res, 500, { ok: false, error: 'cannot persist configuration in this runtime' });
+            return;
+          }
+
+          // success: return updated activeModelId
+          sendJson(res, 200, { ok: true, activeModelId: modelId });
+          return;
+        } catch (err) {
+          sendJson(res, 500, { ok: false, error: String(err) });
+          return;
+        }
       }
     } catch (err) {
       // ignore and continue to normal routing
