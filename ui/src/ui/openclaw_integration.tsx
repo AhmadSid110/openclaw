@@ -5,9 +5,33 @@ import { ChatView } from './openclaw_ChatView';
 import { ToolTracePanel } from './openclaw_ToolTrace';
 import { PresetBadge } from './openclaw_PresetBadge';
 
+// Ensure a safe global event queue and placeholders so the host can push events
+// before the React app mounts. This prevents __openclaw_addEvent from being
+// undefined and drops no events.
+(function initOpenClawGlobals() {
+  const w = (window as any);
+  if (!w.__openclaw_event_queue) w.__openclaw_event_queue = [];
+  if (typeof w.__openclaw_addEvent !== 'function') {
+    w.__openclaw_addEvent = function (ev: any) {
+      w.__openclaw_event_queue.push(ev);
+    };
+  }
+  if (typeof w.__OPENCLAW_WS__ === 'undefined') w.__OPENCLAW_WS__ = null;
+})();
+
 function App() {
   const { chatMessages, toolTraces, addEvent, stop, insertAssistantMessage, clear } = useEventStream();
+  // Replace the placeholder with the real handler and flush queued events.
   (window as any).__openclaw_addEvent = addEvent;
+  try {
+    const q = (window as any).__openclaw_event_queue;
+    if (Array.isArray(q) && q.length) {
+      q.forEach((ev: any) => { try { addEvent(ev); } catch (e) {} });
+      q.length = 0;
+    }
+  } catch (e) {
+    // ignore
+  }
 
   const handleInsert = (text: string) => insertAssistantMessage(text, false);
 
