@@ -619,3 +619,43 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===========================================
+   Connection Status Bar (Suggestion 2)
+   =========================================== */
+
+.conn-status-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 1000;
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease;
+  pointer-events: none;
+}
+
+.conn-status-bar.connected {
+  background-color: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+.conn-status-bar.disconnected {
+  background-color: #ff4444;
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.8);
+  animation: conn-pulse 1.5s infinite;
+}
+
+@keyframes conn-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}

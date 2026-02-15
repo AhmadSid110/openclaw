@@ -27,6 +27,15 @@ describe("checkBrowserOrigin", () => {
     expect(result.ok).toBe(true);
   });
 
+  it("accepts comma-separated allowed origin strings", () => {
+    const result = checkBrowserOrigin({
+      requestHost: "gateway.example.com:18789",
+      origin: "https://control.example.com",
+      allowedOrigins: "https://control.example.com, https://other.example.com",
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects missing origin", () => {
     const result = checkBrowserOrigin({
       requestHost: "gateway.example.com:18789",

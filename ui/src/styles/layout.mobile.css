@@ -216,7 +216,7 @@
 
   .chat-thread {
     margin-top: 8px;
-    padding: 12px 8px;
+    padding: 12px 12px 220px;
   }
 
   .chat-msg {
@@ -230,6 +230,20 @@
 
   .chat-compose {
     gap: 8px;
+    padding: 10px 14px 18px;
+    background: var(--panel-strong);
+    border-top: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 -8px 24px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(12px);
+  }
+
+  .chat-attachments {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
   }
 
   .chat-compose__field textarea {

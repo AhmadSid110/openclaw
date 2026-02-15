@@ -43,14 +43,19 @@ function parseOrigin(
 export function checkBrowserOrigin(params: {
   requestHost?: string;
   origin?: string;
-  allowedOrigins?: string[];
+  allowedOrigins?: string | string[];
 }): OriginCheckResult {
   const parsedOrigin = parseOrigin(params.origin);
   if (!parsedOrigin) {
     return { ok: false, reason: "origin missing or invalid" };
   }
 
-  const allowlist = (params.allowedOrigins ?? [])
+  const allowedInput = params.allowedOrigins;
+  const allowlist = (
+    Array.isArray(allowedInput) ? allowedInput : allowedInput ? [allowedInput] : []
+  )
+    .filter(Boolean)
+    .flatMap((value) => value.split(","))
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
   if (allowlist.includes(parsedOrigin.origin)) {

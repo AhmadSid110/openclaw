@@ -206,7 +206,8 @@ Notes:
 - Use `wss://` when the Gateway is behind TLS (Tailscale Serve, HTTPS proxy, etc.).
 - `gatewayUrl` is only accepted in a top-level window (not embedded) to prevent clickjacking.
 - For cross-origin dev setups (e.g. `pnpm ui:dev` to a remote Gateway), add the UI
-  origin to `gateway.controlUi.allowedOrigins`.
+  origin(s) to `gateway.controlUi.allowedOrigins`. You can pass an array, a single string,
+  or a comma-separated list of origins.
 
 Example:
 
@@ -219,5 +220,7 @@ Example:
   },
 }
 ```
+
+You can also pass `allowedOrigins` as a single string or a comma-separated list of origins when you prefer not to use an array.
 
 Remote access setup details: [Remote access](/gateway/remote).

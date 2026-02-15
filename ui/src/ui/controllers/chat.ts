@@ -168,6 +168,19 @@ export async function abortChatRun(state: ChatState): Promise<boolean> {
   }
 }
 
+function dispatchAssistantNotification(text: string | null) {
+  if (!text) {
+    return;
+  }
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return;
+  }
+  window.dispatchEvent(
+    new CustomEvent("openclaw:assistant-message", { detail: { text: trimmed } }),
+  );
+}
+
 export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   if (!payload) {
     return null;
@@ -194,6 +207,13 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
       }
     }
   } else if (payload.state === "final") {
+    const currentRunId = state.chatRunId;
+    const payloadMessage = payload.message as Record<string, unknown> | undefined;
+    const role = typeof payloadMessage?.role === "string" ? payloadMessage.role : "";
+    const assistantText = extractText(payload.message);
+    if (currentRunId && payload.runId && payload.runId === currentRunId && role === "assistant") {
+      dispatchAssistantNotification(assistantText);
+    }
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;

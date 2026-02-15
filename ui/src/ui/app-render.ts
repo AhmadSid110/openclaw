@@ -72,11 +72,11 @@ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
+import { renderModels, attachModelsLoader } from "./views/models.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
-import { renderModels, attachModelsLoader } from "./views/models.ts";
 import { renderUsage } from "./views/usage.ts";
 
 const AVATAR_DATA_RE = /^data:/i;
@@ -119,6 +119,7 @@ export function renderApp(state: AppViewState) {
 
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
+      <div class="conn-status-bar ${state.connected ? "connected" : "disconnected"}" title="${state.connected ? "Connected" : "Disconnected"}"></div>
       <header class="topbar">
         <div class="topbar-left">
           <button
@@ -609,7 +610,12 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "models"
-            ? ( () => { if (!state.models.length && !state.loadingModels) { setTimeout(() => void state.loadModels(), 0); } return renderModels(state); })()
+            ? (() => {
+                if (!state.models.length && !state.loadingModels) {
+                  setTimeout(() => void state.loadModels(), 0);
+                }
+                return renderModels(state);
+              })()
             : nothing
         }
 

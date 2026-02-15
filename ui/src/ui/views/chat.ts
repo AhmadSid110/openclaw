@@ -14,6 +14,7 @@ import { icons } from "../icons.ts";
 import { detectTextDirection } from "../text-direction.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
 import "../components/resizable-divider.ts";
+import "../components/chat-input.ts";
 
 export type CompactionIndicatorStatus = {
   active: boolean;
@@ -73,9 +74,16 @@ export type ChatProps = {
 
 const COMPACTION_TOAST_DURATION_MS = 5000;
 
-function adjustTextareaHeight(el: HTMLTextAreaElement) {
+function adjustTextareaHeight(el: HTMLTextAreaElement, minRows = 2, maxRows = 6) {
+  const style = window.getComputedStyle(el);
+  const lineHeight = parseInt(style.lineHeight || "18", 10) || 18;
+  const minHeight = lineHeight * minRows;
+  const maxHeight = lineHeight * maxRows;
+  // Reset to measure
   el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  const nextHeight = Math.min(Math.max(el.scrollHeight, minHeight), maxHeight);
+  el.style.height = `${nextHeight}px`;
+  el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
 function renderCompactionIndicator(status: CompactionIndicatorStatus | null | undefined) {
@@ -202,7 +210,7 @@ export function renderChat(props: ChatProps) {
   const composePlaceholder = props.connected
     ? hasAttachments
       ? "Add a message or paste more images..."
-      : "Message (↩ to send, Shift+↩ for line breaks, paste images)"
+      : "Message (Ctrl+Enter to send, Enter for new line)"
     : "Connect to the gateway to start chatting…";
 
   const splitRatio = props.splitRatio ?? 0.6;
@@ -368,61 +376,20 @@ export function renderChat(props: ChatProps) {
           : nothing
       }
 
-      <div class="chat-compose">
-        ${renderAttachmentPreview(props)}
-        <div class="chat-compose__row">
-          <label class="field chat-compose__field">
-            <span>Message</span>
-            <textarea
-              ${ref((el) => el && adjustTextareaHeight(el as HTMLTextAreaElement))}
-              .value=${props.draft}
-              dir=${detectTextDirection(props.draft)}
-              ?disabled=${!props.connected}
-              @keydown=${(e: KeyboardEvent) => {
-                if (e.key !== "Enter") {
-                  return;
-                }
-                if (e.isComposing || e.keyCode === 229) {
-                  return;
-                }
-                if (e.shiftKey) {
-                  return;
-                } // Allow Shift+Enter for line breaks
-                if (!props.connected) {
-                  return;
-                }
-                e.preventDefault();
-                if (canCompose) {
-                  props.onSend();
-                }
-              }}
-              @input=${(e: Event) => {
-                const target = e.target as HTMLTextAreaElement;
-                adjustTextareaHeight(target);
-                props.onDraftChange(target.value);
-              }}
-              @paste=${(e: ClipboardEvent) => handlePaste(e, props)}
-              placeholder=${composePlaceholder}
-            ></textarea>
-          </label>
-          <div class="chat-compose__actions">
-            <button
-              class="btn"
-              ?disabled=${!props.connected || (!canAbort && props.sending)}
-              @click=${canAbort ? props.onAbort : props.onNewSession}
-            >
-              ${canAbort ? "Stop" : "New session"}
-            </button>
-            <button
-              class="btn primary"
-              ?disabled=${!props.connected}
-              @click=${props.onSend}
-            >
-              ${isBusy ? "Queue" : "Send"}<kbd class="btn-kbd">↵</kbd>
-            </button>
-          </div>
-        </div>
-      </div>
+      <chat-input
+        .draft=${props.draft}
+        .status=${props.stream ? "streaming" : props.loading ? "loading" : "idle"}
+        .disabled=${!props.connected}
+        .attachments=${props.attachments || []}
+        .onDraftChange=${props.onDraftChange}
+        .onSend=${(text: string) => {
+          props.onDraftChange(text);
+          props.onSend();
+        }}
+        .onNewSession=${props.onNewSession}
+        .onAttachmentsChange=${props.onAttachmentsChange}
+        style="width: 100%;"
+      ></chat-input>
     </section>
   `;
 }

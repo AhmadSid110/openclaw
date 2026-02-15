@@ -123,42 +123,53 @@ export function connectGateway(host: GatewayHost) {
   host.execApprovalError = null;
 
   host.client?.stop();
-  host.client = new GatewayBrowserClient({
-    url: host.settings.gatewayUrl,
-    token: host.settings.token.trim() ? host.settings.token : undefined,
-    password: host.password.trim() ? host.password : undefined,
-    clientName: "openclaw-control-ui",
-    mode: "webchat",
-    onHello: (hello) => {
-      host.connected = true;
-      host.lastError = null;
-      host.hello = hello;
-      applySnapshot(host, hello);
-      // Reset orphaned chat run state from before disconnect.
-      // Any in-flight run's final event was lost during the disconnect window.
-      host.chatRunId = null;
-      (host as unknown as { chatStream: string | null }).chatStream = null;
-      (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
-      resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
-      void loadAssistantIdentity(host as unknown as OpenClawApp);
-      void loadAgents(host as unknown as OpenClawApp);
-      void loadNodes(host as unknown as OpenClawApp, { quiet: true });
-      void loadDevices(host as unknown as OpenClawApp, { quiet: true });
-      void refreshActiveTab(host as unknown as Parameters<typeof refreshActiveTab>[0]);
-    },
-    onClose: ({ code, reason }) => {
-      host.connected = false;
-      // Code 1012 = Service Restart (expected during config saves, don't show as error)
-      if (code !== 1012) {
-        host.lastError = `disconnected (${code}): ${reason || "no reason"}`;
-      }
-    },
-    onEvent: (evt) => handleGatewayEvent(host, evt),
-    onGap: ({ expected, received }) => {
-      host.lastError = `event gap detected (expected seq ${expected}, got ${received}); refresh recommended`;
-    },
-  });
-  host.client.start();
+
+  if (!host.settings.gatewayUrl || !host.settings.gatewayUrl.trim()) {
+    host.lastError = "Gateway URL is not configured.";
+    return;
+  }
+
+  try {
+    host.client = new GatewayBrowserClient({
+      url: host.settings.gatewayUrl,
+      token: host.settings.token.trim() ? host.settings.token : undefined,
+      password: host.password.trim() ? host.password : undefined,
+      clientName: "openclaw-control-ui",
+      mode: "webchat",
+      onHello: (hello) => {
+        host.connected = true;
+        host.lastError = null;
+        host.hello = hello;
+        applySnapshot(host, hello);
+        // Reset orphaned chat run state from before disconnect.
+        // Any in-flight run's final event was lost during the disconnect window.
+        host.chatRunId = null;
+        (host as unknown as { chatStream: string | null }).chatStream = null;
+        (host as unknown as { chatStreamStartedAt: number | null }).chatStreamStartedAt = null;
+        resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
+        void loadAssistantIdentity(host as unknown as OpenClawApp);
+        void loadAgents(host as unknown as OpenClawApp);
+        void loadNodes(host as unknown as OpenClawApp, { quiet: true });
+        void loadDevices(host as unknown as OpenClawApp, { quiet: true });
+        void refreshActiveTab(host as unknown as Parameters<typeof refreshActiveTab>[0]);
+      },
+      onClose: ({ code, reason }) => {
+        host.connected = false;
+        // Code 1012 = Service Restart (expected during config saves, don't show as error)
+        if (code !== 1012) {
+          host.lastError = `disconnected (${code}): ${reason || "no reason"}`;
+        }
+      },
+      onEvent: (evt) => handleGatewayEvent(host, evt),
+      onGap: ({ expected, received }) => {
+        host.lastError = `event gap detected (expected seq ${expected}, got ${received}); refresh recommended`;
+      },
+    });
+    host.client.start();
+  } catch (err) {
+    console.error("[gateway] connection error:", err);
+    host.lastError = `Failed to initialize connection: ${String(err)}`;
+  }
 }
 
 export function handleGatewayEvent(host: GatewayHost, evt: GatewayEventFrame) {
